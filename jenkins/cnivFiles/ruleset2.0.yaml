@@ -1,0 +1,1042 @@
+# COPYRIGHT Ericsson 2021
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+
+modelVersion: 2.0
+
+description: "CNIV CI Pipeline Ruleset"
+
+# See image catalog: https://confluence.lmera.ericsson.se/display/ACD/ADP+CICD+Docker+Image+Catalog
+docker-images:
+  - adp-asciidoc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-asciidocbuilder:${env.ASCII_DOC_BUILDER_TAG}
+  - adp-doc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-docbuilder:${env.DOC_BUILDER_TAG}
+  - adp-go-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-gobuilder.adp-base-os:${env.GO_BUILDER_TAG}
+  - adp-helm-dr-check: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/adp-helm-dr-checker:${env.HELM_DR_CHECK_TAG}
+  - adp-helm-kubectl: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-py3kubehelmbuilder:${env.HELM_KUBECTL_TAG}
+  - adp-image-dr-check: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/adp-image-dr-check:${env.IMAGE_DR_CHECK_TAG}
+  - adp-maven-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-java11mvnbuilder:${env.MVN_BUILDER_TAG}
+  - adp-release-auto: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-adp-release-auto:${env.RELEASE_AUTO_TAG}
+  - adp-release-ihcauto: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/adp-int-helm-chart-auto:latest
+  - bth-linter: armdocker.rnd.ericsson.se/proj-eric-oss-drop/eric-bth/eric-bth-spectral-linter:${env.BTH_LINTER_TAG}
+  - cihelm: serodocker.sero.gic.ericsson.se/proj-pc-tools-released/cihelm:0.4.1
+  - doc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-docbuilder:latest
+  - elib-make-utilities: ${elib-make-subpath}-oss-drop/eric-elib/elib_makeutilities:${env.ELIB_MAKE_UTILITIES_TAG}
+  - grype-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-image-scanning-grype:${env.ANCHORE_TAG}
+  - hadolint-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/hadolint-scan:${env.HADOLINT_TAG}
+  - pgbm-ci-py37: armdocker.rnd.ericsson.se/proj_oss_releases/enm/pgbm-ci-py37:1.0.0
+  - pgbm-ci-py310: armdocker.rnd.ericsson.se/proj_oss_releases/enm/pgbm-ci-py310:1.0.0
+  - sdk-validator: armdocker.rnd.ericsson.se/proj-eric-oss-sdkschema-drop/eric-oss-sdkschema-validator:${env.SDKSCHEMA_VALIDATOR_TAG}
+  - trivy-inline-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/trivy-inline-scan:${env.TRIVY_TAG}
+  - va-scan-kubesec: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubesec:${env.KUBESEC_TAG}
+  - va-scan-kubeaudit: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubeaudit:${env.KUBEAUDIT_TAG}
+  - va-scan-kubehunter: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubehunter:${env.KUBEHUNTER_TAG}
+  - va-scan-kubebench: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubebench:${env.KUBEBENCH_TAG}
+  - yaml-lint: armdocker.rnd.ericsson.se/proj_oss_releases/enm/yamlvalidate:latest
+
+# List of constants
+properties:
+  - elib-make-subpath: armdocker.rnd.ericsson.se/proj-eric
+  - project-subpath: ${env.PROJECT_SUBPATH}
+  - image-registry-path: armdocker.rnd.ericsson.se/${project-subpath}/${project-subpath}
+  - image-secret: armdocker
+  - image-dev-repopath: ${image-registry-path}-dev
+  - image-ci-repopath: ${image-registry-path}-ci-internal
+  - image-drop-repopath: ${image-registry-path}-drop
+  - image-ci-full-name: ${image-ci-repopath}/${var.docker-image-name}
+  - image-full-name: ${image-drop-repopath}/${var.docker-image-name}
+  - integration-values-path: integration-values
+
+  # Generic Artifactory paths
+  - generic-repo-server-path: https://arm.seli.gic.ericsson.se/artifactory/${project-subpath}
+
+  # Helm Chart name must follow the pattern: eric-[a-z0-9]{1,5}-[a-z0-9-]{1,30}
+  - helm-chart-dev-repopath: ${generic-repo-server-path}-dev-helm
+  - helm-chart-ci-repopath: ${generic-repo-server-path}-ci-internal-helm
+  - helm-chart-drop-repo: ${generic-repo-server-path}-drop-helm
+  - helm-chart-drop-integration-values-path: eric-enm-cniv-integration-values
+
+  # Go Package Artifactory paths
+  - go-package-dev-repopath: ${generic-repo-server-path}-dev-go
+  - go-package-ci-repopath: ${generic-repo-server-path}-ci-internal-go
+  - go-package-drop-repo: ${generic-repo-server-path}-drop-go
+
+  # Generic repository for publishing artifacts such as documentation
+  - generic-drop-repo: ${generic-repo-server-path}-drop-generic
+
+  # Functional ID for your Team or CI group to push to Gerrit repo
+  - git-user: ${gitUsername}
+  - git-repo-path: ${gitRepoPath}
+  - git-repo-url: https://gerrit-gamma.gic.ericsson.se/a/${git-repo-path}
+  - git-repo: https://gerrit-gamma.gic.ericsson.se/#/admin/projects/${git-repo-path}
+
+  - enabled-helm-design-rules: "-DhelmDesignRule.config.drHc011=enable -DhelmDesignRule.config.DR-D1120-045-AD=enable"
+
+  # VA IMAGES
+  - image-to-scan: ${image-ci-full-name}:${var.version}
+
+  # VA HTML REPORT
+  - build-dir: build/marketplace
+  - config-file: marketplace-config.yaml
+  - html-output: html
+
+  # GO PACKAGING
+  - golang-ldflags: "-w -s -X main.Version=1.0.0-868e2f4 -X main.Commit=868e2f4 -extldflags '-static'"
+  - golang-build-path: "build/bin"
+  # GOBIN - The directory where 'go install' will install a command.
+  # CGO_ENABLED - Whether the cgo command is supported. Either 0 (disabled) or 1 (enabled).
+  # GOPRIVATE - Controls which modules the go command considers to be private (not available publicly) and should therefore not use the proxy or checksum database.
+  # GOCACHE - The directory where the go command will store cached information for reuse in future builds.
+  - docker-goparams: "
+      --workdir ${env.PWD} \
+      --env GOBIN=${env.PWD}/build/bin \
+      --env CGO_ENABLED=0 \
+      --env GOPRIVATE=gerrit-gamma.gic.ericsson.se/adp-ref-app \
+      --env GOCACHE=${env.PWD}/build/gocache \
+      --env GOPATH=/tmp"
+
+# import environment variables (For example: Jenkins parameters)
+env:
+  - HOME
+  - PWD
+  - RELEASE (default=true)
+  - MVN_SETTINGS (default=/home/enmadm100/.m2/settings.xml)
+  - POM_FILE_PATH
+  - PROJECT_SUBPATH
+  - DOCKER_REGISTRY (default=armdocker.rnd.ericsson.se)
+
+  # Kubernetes
+  - COLLECT_LOGS_SCRIPT_LOCATION (default="https://arm.sero.gic.ericsson.se/artifactory/proj-ADP_GS_Support_FTP-generic-local/collect_ADP_logs")
+  - ENABLE_HELM_V3 (default=true)
+  - BUILD_DIR (default=./build)
+  - KUBECONFIG (default=$PWD/.kube/config)
+  - K8NAMESPACE
+  - STORAGE_CLASS_NAME
+  - HELM_RELEASE (default=${var.helm-chart-name}-release)
+  - HELM_INSTALL_TIMEOUT (default=5m0s)
+
+  # Credentials
+  - GERRIT_CHANGE_NUMBER (default=$GERRIT_CHANGE_NUMBER)
+  - ARTIFACTORY_USR
+  - ARTIFACTORY_PSW
+
+  # Default docker image tags
+  - ASCII_DOC_BUILDER_TAG (default=latest)
+  - DOC_BUILDER_TAG (default=2.3.0-latest)
+  - ELIB_MAKE_UTILITIES_TAG (default=latest)
+  - HELM_DR_CHECK_TAG (default=latest)
+  - HELM_KUBECTL_TAG (default=latest)
+  - IMAGE_DR_CHECK_TAG (default=latest)
+  - MVN_BUILDER_TAG (default=latest)
+  - GO_BUILDER_TAG (default=latest)
+  - RELEASE_AUTO_TAG (default=latest)
+  - BTH_LINTER_TAG (default=latest)
+  - SDKSCHEMA_VALIDATOR_TAG (default=latest)
+
+  # VA Tools docker image tags
+  - ANCHORE_TAG (default=latest)
+  - TRIVY_TAG (default=latest)
+  - KUBESEC_TAG (default=latest)
+  - KUBEAUDIT_TAG (default=latest)
+  - KUBEHUNTER_TAG (default=latest)
+  - KUBEBENCH_TAG (default=latest)
+  - HADOLINT_TAG (default=latest)
+
+  # InCA
+  - ISO_VERSION
+  - BUILD_DATE (default = $(date +%d%m%Y-%H%M%S --utc))
+  - ADD_ARTIFACTS (default="")
+  - REQUIREMENTS_FILE(default="requirements.yaml")
+  - GIT_BRANCH (default=master)
+  - CHART_NAME
+  - CHART_VERSION
+  - GERRIT_USERNAME
+  - GERRIT_PASSWORD
+  - GERRIT_REFSPEC
+  - HELM_INTERNAL_REPO
+  - HELM_DROP_REPO
+  - HELM_RELEASED_REPO
+  - STDOUT_VERSION (default=1.7.0)
+  - HELM_REPO_CREDENTIALS (default=$PWD/repositories.yaml)
+  - PRODUCTION_DATE (default = $(date +%FT%TZ --utc))
+
+# Variables, set by below tasks
+var:
+  - commithash
+  - commithash-full
+  - commit-author
+  - commit-email
+  - docker-config-basepath
+  - docker-file-sidecar-path
+  - docker-image-name
+  - git-repo-url
+  - go-package-repo-internal
+  - helm-chart-image-repopath
+  - helm-chart-name
+  - helm-chart-repo-internal
+  - integration-chart-path
+  - image-dr-vm-args
+  - image-full-name-internal
+  - image-product-number
+  - image-repopath-internal
+  - image-repopath-drop
+  - image-registry
+  - kaas-version
+  - kaas-current-context
+  - namespace
+  - pom-version
+  - rest2html-optional
+  - revision
+  - rstate
+  - resultcode-hadolint-check
+  - version
+  - version-prefix
+  - save-namespace
+  - va-report-arguments
+  - work-dir
+
+# Rules to execute
+rules:
+  #-----------------------------------------
+  # CNIV Pipeline Repo Rules
+  #-----------------------------------------
+
+  pre-code-review:
+    - description: For PreCodeReview Job - CNIV Pipeline Ruleset
+    - task: echo-test-1
+      description: echo cmd
+      cmd: echo "Testing CNIV Pipeline Ruleset"
+    - task: ls-test-2
+      description: ls cmd
+      cmd: ls
+
+  #-----------------------------------------
+  # CNIV Pipeline Rules
+  #-----------------------------------------
+
+  # Integrated rule to execute everything locally (init-dev)
+  release:
+    - rule: clean
+    - rule: init-dev
+    - rule: lint
+    - rule: build
+    - rule: test
+    - rule: image
+    - rule: image-dr-check
+    - rule: package
+    - rule: package-jars
+    - rule: k8s-test
+
+  # Common tasks for all init rules
+  init-common:
+    - task: version
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env RELEASE"
+      cmd: version-handler generate --is-release ${env.RELEASE} --output version  --git-repo-path .
+    - task: rstate
+      docker-image: adp-release-auto
+      cmd: get_rstate.py ${var.version} > .bob/var.rstate
+    - task: commit
+      docker-image: adp-release-auto
+      cmd:
+        - git rev-parse --short HEAD > .bob/var.commithash
+        - git rev-parse HEAD > .bob/var.commithash-full
+        - git log -1 --format='%aN' > .bob/var.commit-author
+        - git log -1 --format='%aE' > .bob/var.commit-email
+    - task: create-temp-dir
+      cmd: mkdir -p ${env.BUILD_DIR}
+
+  init-common-precodereview:
+    - rule: init-common
+    - task: generate-snapshot-version
+      cmd: echo ${var.version}-${var.commithash}  > .bob/var.version
+
+  # Dev Tasks: only used by manually publishing development/black builds by developers
+  init-dev:
+    - rule: init-common
+    - task: preliminary-revision # For example: PA1
+      cmd: RSTATE=${var.rstate} && echo P${RSTATE:2}1 > .bob/var.revision
+    - task: image-repopath-internal
+      cmd: echo "${image-dev-repopath}" | cut -f2- -d '/' > .bob/var.image-repopath-internal
+    - task: image-registry
+      cmd: echo "${image-dev-repopath}" | cut -f1 -d '/' > .bob/var.image-registry
+    - task: image-full-name-internal
+      cmd: echo "${image-dev-repopath}/${var.docker-image-name}" > .bob/var.image-full-name-internal
+    - task: helm-chart-repo-internal
+      cmd: echo "${helm-chart-dev-repopath}" > .bob/var.helm-chart-repo-internal
+    - task: helm-chart-image-repopath
+      cmd: echo "${project-subpath}/${project-subpath}-ci-internal" > .bob/var.helm-chart-image-repopath
+    - task: go-package-repo-internal
+      cmd: echo "${go-package-dev-repopath}" > .bob/var.go-package-repo-internal
+    - task: image-dr-vm-args
+      cmd: echo " -DimageDesignRule.config.DR-D470203-041-A=disable -DimageDesignRule.config.DR-D470203-050-A=disable" > .bob/var.image-dr-vm-args
+    - task: namespace
+      cmd: echo "${env.K8NAMESPACE}-pcr" > .bob/var.namespace
+
+  # CI-Internal Tasks: used by CI to use as temporary storage for testing, only CI user has write access.
+  init-precodereview:
+    - rule: init-common-precodereview
+    - task: preliminary-revision # For example: PA1
+      cmd: RSTATE=${var.rstate} && echo P${RSTATE:2}1 > .bob/var.revision
+    - task: image-repopath-internal
+      cmd: echo "${image-ci-repopath}" | cut -f2- -d '/' > .bob/var.image-repopath-internal
+    - task: image-registry
+      cmd: echo "${image-ci-repopath}" | cut -f1 -d '/' > .bob/var.image-registry
+    - task: image-full-name-internal
+      cmd: echo "${image-ci-repopath}/${var.docker-image-name}" > .bob/var.image-full-name-internal
+    - task: helm-chart-repo-internal
+      cmd: echo "${helm-chart-ci-repopath}" > .bob/var.helm-chart-repo-internal
+    - task: helm-chart-image-repopath
+      cmd: echo "${project-subpath}/${project-subpath}-ci-internal" > .bob/var.helm-chart-image-repopath
+    - task: go-package-repo-internal
+      cmd: echo "${go-package-ci-repopath}" > .bob/var.go-package-repo-internal
+    - task: image-dr-vm-args
+      cmd: echo " -DimageDesignRule.config.DR-D470203-041-A=disable -DimageDesignRule.config.DR-D470203-050-A=disable" > .bob/var.image-dr-vm-args
+    - task: namespace
+      cmd: echo "${env.K8NAMESPACE}-pcr" > .bob/var.namespace
+
+  # Drop level tasks: used by CI to publish artifacts after successful CI pipeline execution for a drop build
+  init-drop:
+    - rule: init-common
+    - task: full-revision # For example: A (Note: The Letters I O P Q R W must never be used for Document Revisioning.
+      cmd:
+        - RSTATE=${var.rstate} && echo ${RSTATE:2} > .bob/var.revision
+        - echo -cpi > .bob/var.rest2html-optional
+    - task: image-repopath-internal
+      cmd: echo "${image-ci-repopath}" | cut -f2- -d '/' > .bob/var.image-repopath-internal
+    - task: image-repopath-drop
+      cmd: echo "${image-drop-repopath}" | cut -f2- -d '/' > .bob/var.image-repopath-drop
+    - task: image-registry
+      cmd: echo "${image-ci-repopath}" | cut -f1 -d '/' > .bob/var.image-registry
+    - task: image-full-name-internal
+      cmd: echo "${image-ci-repopath}/${var.docker-image-name}" > .bob/var.image-full-name-internal
+    - task: helm-chart-repo-internal
+      cmd: echo "${helm-chart-ci-repopath}" > .bob/var.helm-chart-repo-internal
+    - task: helm-chart-image-repopath
+      cmd: echo "${project-subpath}/${project-subpath}-drop" > .bob/var.helm-chart-image-repopath
+    - task: go-package-repo-internal
+      cmd: echo "${go-package-ci-repopath}" > .bob/var.go-package-repo-internal
+    - task: namespace
+      cmd: echo "${env.K8NAMESPACE}-drop" > .bob/var.namespace
+    - task: adp-artifacts-properties
+      docker-image: adp-release-auto
+      cmd: generate-adp-artifacts
+        --chart-name ${var.helm-chart-name}
+        --chart-version ${var.version}
+        --chart-repo ${helm-chart-drop-repo}
+        --image-name ${var.docker-image-name}
+        --image-version ${var.version}
+        --image-repo "${var.image-registry}/${var.image-repopath-drop}"
+    - task: write-git-details
+      cmd:
+        - echo "GIT_TAG=$(git log -1 --pretty=format:'%h')" >> artifact.properties
+        - echo "GIT_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')" >> artifact.properties
+        - echo "GIT_COMMIT_AUTHOR_EMAIL=$(git log -1 --format='%aE')" >> artifact.properties
+        - echo "GIT_COMMIT_SUMMARY=$(git log -1 --pretty=format:'%s')" >> artifact.properties
+    - task: image-dr-vm-args
+      cmd: echo "" > .bob/var.image-dr-vm-args
+
+  lint:
+    - task: markdownlint
+      docker-image: adp-doc-builder
+      cmd: bash -c 'markdownlint --config /etc/markdownlint-cli/adp.yaml $(git ls-files -- \*\.md | cat | xargs)' || true
+    - task: vale
+      docker-image: adp-doc-builder
+      cmd: bash -c 'vale --output line --no-wrap $(git ls-files -- \*\.md | cat | xargs)' || true
+    - task: helm
+      docker-image: adp-helm-dr-check
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: helm3 lint ${var.integration-chart-path}
+    - task: helm-chart-check
+      docker-image: adp-helm-dr-check
+      cmd: java -DhelmDesignRule.feature.dependency=1 ${enabled-helm-design-rules} -jar /helm-dr-check.jar --helm-chart ${var.integration-chart-path} -c
+    - task: metrics-check
+      cmd:
+        - . ./ci/scripts/metrics-checker.sh --chmod=+x && checkValuesYAML ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && checkServiceYAML ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && checkDeploymentYAML ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && checkHelperTPL ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && checkPomXML ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && checkCoreApplicationJAVA ${var.helm-chart-name}
+        - . ./ci/scripts/metrics-checker.sh && passOrFailCheck
+    - task: hadolint-scan
+      docker-image: hadolint-scan
+      docker-flags:
+        - "--workdir /app/"
+        - "-v ${env.PWD}/config/hadolint_scan_config.yaml:/data/custom_config.yaml"
+        - "-v ${env.PWD}/Dockerfile:/data/Dockerfile"
+        - "-v ${env.PWD}/build/va-reports/hadolint-reports:/tmp/reports/"
+      cmd: -p product_name -f /data/Dockerfile -c /data/custom_config.yaml
+    - task: go
+      docker-image: adp-go-builder
+      docker-flags:
+        - ${docker-goparams}
+        - "-t"
+      cmd:
+        - golangci-lint run --config .golangci.yml
+          --out-format=checkstyle ./... | tee .bob/go-checkstyle.xml
+
+  helm-dep-up:
+    - task: helm-dep-up
+      docker-image: cihelm
+      docker-flags:
+        - "--env ENABLE_HELM_V3=${env.ENABLE_HELM_V3}"
+        - "--env HELM_REPO_CREDENTIALS=${env.HELM_REPO_CREDENTIALS}"
+        - "-v /etc/group:/etc/group:ro"
+        - "-v /etc/passwd:/etc/passwd:ro"
+        - "-v ${env.HELM_REPO_CREDENTIALS}:${env.HELM_REPO_CREDENTIALS}:ro"
+      cmd:
+        --helm-credentials "${env.HELM_REPO_CREDENTIALS}"
+        --retry-timeout 300
+        dependency update ${var.integration-chart-path}
+
+  # Maven Unit Tests
+  maven-unit-test:
+    - task: create-empty-settings.xml # mandatory for settings.xml mounting below
+      cmd:
+       - touch ${env.POM_FILE_PATH}/settings.xml
+    - task: mvn-clean-install
+      docker-image: adp-maven-builder
+      docker-flags: &mvn-docker-flags
+        - "--env HOME=${env.PWD}/${env.POM_FILE_PATH}"
+        - "--env MAVEN_OPTS=-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
+        - "--volume ${env.PWD}:${env.PWD}"
+        - "--volume ${env.MVN_SETTINGS}:${env.PWD}/${env.POM_FILE_PATH}/settings.xml:ro"
+        - "--workdir ${env.PWD}/${env.POM_FILE_PATH}"
+      cmd: mvn -B -Dmaven.repo.local=${env.PWD}/${env.POM_FILE_PATH} -f pom.xml -s settings.xml clean install
+
+  # Build java source code and package jar file, no need image building at this stage
+  build-helm:
+    - task: helm-package
+      docker-image: cihelm
+      docker-flags:
+        - "--env ENABLE_HELM_V3=${env.ENABLE_HELM_V3}"
+        - "--env HELM_REPO_CREDENTIALS=${env.HELM_REPO_CREDENTIALS}"
+        - "-v /etc/group:/etc/group:ro"
+        - "-v /etc/passwd:/etc/passwd:ro"
+        - "-v ${env.HELM_REPO_CREDENTIALS}:${env.HELM_REPO_CREDENTIALS}:ro"
+      cmd:
+        --helm-credentials "${env.HELM_REPO_CREDENTIALS}"
+        --retry-timeout 300
+        package
+        --version '${var.version}'
+        --replace 'values.yaml:VERSION=${var.version}'
+        --replace 'values.yaml:RSTATE=${var.rstate}'
+        --replace "values.yaml:REPO_URL=${env.DOCKER_REGISTRY}"
+        --replace 'values.yaml:REPO_PATH=${var.helm-chart-image-repopath}'
+        --replace 'eric-product-info.yaml:REPO_PATH=${var.helm-chart-image-repopath}'
+        --replace 'eric-product-info.yaml:VERSION=${var.version}'
+        '${var.integration-chart-path}'
+
+  # Build a docker image pointing to dirty repository
+  image:
+    - task: docker-build
+      cmd: docker build ${env.PWD}
+        --tag ${var.image-full-name-internal}:${var.version}
+        --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        --build-arg COMMIT=${var.commithash}
+        --build-arg APP_VERSION=${var.version}
+        --build-arg RSTATE=${var.rstate}
+        --build-arg IMAGE_PRODUCT_NUMBER=${var.image-product-number}
+        --build-arg MODULE_NAME=server_scripting
+    - task: docker-build-sidecars
+      cmd: docker build ${env.PWD}/${var.docker-file-sidecar-path}
+        --tag ${image-ci-repopath}/${var.docker-file-sidecar-path}:${var.version}
+        --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        --build-arg COMMIT=${var.commithash}
+        --build-arg APP_VERSION=${var.version}
+        --build-arg RSTATE=${var.rstate}
+        --build-arg IMAGE_PRODUCT_NUMBER=${var.image-product-number}
+
+  # Delete docker images created
+  delete-images:
+    - task: delete-internal-image
+      cmd: docker image remove ${var.image-full-name-internal}:${var.version} $(docker images -f "dangling=true" -q) || true
+    - task: delete-drop-image
+      cmd:
+        - docker image remove ${image-full-name}:${var.version} $(docker images -f "dangling=true" -q) || true
+        - docker image remove ${image-full-name}:latest $(docker images -f "dangling=true" -q) || true
+
+  # Build java source code and package jar file, no need image building at this stage
+  build-go:
+    - task: go-package
+      docker-image: adp-go-builder
+      docker-flags:
+        - ${docker-goparams}
+      cmd:
+        # -v 'print the names of packages as they are compiled'
+        # -a 'force rebuilding of packages that are already up-to-date'
+        # -o 'forces build to write the resulting executable or object to the named output file or directory'
+        # Three dots are used by the go command as a wildcard when describing package lists - install all packages in the current directory and its subdirectories
+        - go install -a -ldflags="${golang-ldflags}" ./...
+        # - go build -v -a -o ${golang-build-path}/${var.docker-image-name} -ldflags="${golang-ldflags}" ./...
+
+  # Check for image design rule compliance
+  image-dr-check:
+    - task: check-image-dr
+      docker-image: adp-image-dr-check
+      docker-in-docker: socket
+      cmd: "image-dr-check
+          --image ${var.image-full-name-internal}:${var.version}
+          --output .bob/check-image/
+          ${var.image-dr-vm-args}"
+
+  # Push image to ci-internal repo and create local version of helm chart
+  package-local:
+    - task: image-push-internal
+      cmd: docker push ${var.image-full-name-internal}:${var.version}
+    - task: image-push-internal-sidecars
+      cmd: docker push ${image-ci-repopath}/${var.docker-file-sidecar-path}:${var.version}
+
+  # Push image to ci-internal repo, create internal version of helm chart and pushes it to internal repo
+  package:
+    - rule: package-local
+    - task: helm-upload-internal
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: upload_file.sh
+        --filename=${var.helm-chart-name}-${var.version}.tgz
+        --repository=${var.helm-chart-repo-internal}/${var.helm-chart-name}
+        --api-token=${env.ARTIFACTORY_PSW}
+
+  # Publish docker images and helm charts to drop repository
+  # Call publish only when merged to master
+  publish:
+    - task: package-helm-public
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: helm-package
+        --folder ${var.integration-chart-path}
+        --workdir .bob --output .
+        --version ${var.version}
+        --replace VERSION=${var.version}
+        --replace REPO_PATH=${var.image-repopath-internal}
+        --replace IMAGE_NAME=${var.docker-image-name}
+    - task: image-pull-internal
+      cmd: docker pull ${var.image-full-name-internal}:${var.version}
+    - task: image-pull-internal-sidecars
+      cmd: docker pull ${image-ci-repopath}/${var.docker-file-sidecar-path}:${var.version}
+    - task: image-tag-public
+      cmd:
+        - docker tag ${var.image-full-name-internal}:${var.version} ${image-full-name}:${var.version}
+        - docker tag ${var.image-full-name-internal}:${var.version} ${image-full-name}:latest
+    - task: image-tag-public-sidecars
+      cmd:
+        - docker tag ${image-ci-repopath}/${var.docker-file-sidecar-path}:${var.version} ${image-drop-repopath}/${var.docker-file-sidecar-path}:${var.version}
+        - docker tag ${image-ci-repopath}/${var.docker-file-sidecar-path}:${var.version} ${image-drop-repopath}/${var.docker-file-sidecar-path}:latest
+    - task: image-push-public
+      cmd:
+        - docker push ${image-full-name}:${var.version}
+        - docker push ${image-full-name}:latest
+    - task: image-push-public-sidecars
+      cmd:
+        - docker push ${image-drop-repopath}/${var.docker-file-sidecar-path}:${var.version}
+        - docker push ${image-drop-repopath}/${var.docker-file-sidecar-path}:latest
+    - task: helm-upload
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: upload_file.sh
+        --filename=${var.helm-chart-name}-${var.version}.tgz
+        --repository=${helm-chart-drop-repo}/${var.helm-chart-name}
+        --api-token=${env.ARTIFACTORY_PSW}
+
+  # Call publish for Go package - ci-internal/drop
+  publish-go:
+    - task: rename-go-package
+      cmd: cp ${golang-build-path}/${var.docker-image-name} ${golang-build-path}/${var.docker-image-name}-${var.version}
+    - task: go-upload-internal
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: upload_file.sh
+        --filename=${golang-build-path}/${var.docker-image-name}-${var.version}
+        --repository=${var.go-package-repo-internal}/${var.docker-image-name}
+        --api-token=${env.ARTIFACTORY_PSW}
+    - task: go-upload
+      docker-image: adp-release-auto
+      docker-flags:
+        - "--env ENABLE_HELM_V3=true"
+      cmd: upload_file.sh
+        --filename=${golang-build-path}/${var.docker-image-name}-${var.version}
+        --repository=${go-package-drop-repo}/${var.docker-image-name}
+        --api-token=${env.ARTIFACTORY_PSW}
+
+  # Creating artifact.properties file - internal
+  generate-output-parameters-internal-stage:
+    - task: generate-version-internal
+      docker-image: adp-release-auto
+      cmd: generate-adp-artifacts --chart-name ${var.helm-chart-name} --chart-repo ${helm-chart-ci-repopath} --chart-version ${var.version} --image-repo ${image-ci-repopath} --image-name ${var.helm-chart-name} --image-version ${var.version}
+
+  # Creating artifact.properties file - drop
+  generate-output-parameters-drop-stage:
+    - task: generate-version-drop
+      docker-image: adp-release-auto
+      cmd: generate-adp-artifacts --chart-name ${var.helm-chart-name} --chart-repo ${helm-chart-drop-repo} --chart-version ${var.version} --image-repo ${image-drop-repopath} --image-name ${var.helm-chart-name} --image-version ${var.version}
+
+  # Generation build version
+  generate-new-version:
+    - task: generate-version
+      docker-image: adp-release-auto
+      cmd: version-handler generate --is-release ${env.RELEASE} --output version  --git-repo-path .
+    - task: set-version-prefix
+      cmd: cat VERSION_PREFIX > .bob/var.version-prefix
+    - task: generate-rstate
+      docker-image: adp-release-auto
+      cmd: get_rstate.py ${var.version} > .bob/var.rstate
+    - task: get-commit-hash
+      docker-image: adp-release-auto
+      cmd: git rev-parse HEAD > .bob/var.commithash
+
+  prepare:
+    - task: prepare-chart
+      docker-image: adp-release-ihcauto
+      docker-flags:
+        - "-v /etc/group:/etc/group:ro"
+        - "-v /etc/passwd:/etc/passwd:ro"
+        - "-v ${env.HELM_REPO_CREDENTIALS}:${env.HELM_REPO_CREDENTIALS}:ro"
+        - "--env CHART_NAME='${env.CHART_NAME}'"
+        - "--env CHART_VERSION='${env.CHART_VERSION}'"
+        - "--env GERRIT_USERNAME='${env.GERRIT_USERNAME}'"
+        - "--env GERRIT_PASSWORD='${env.GERRIT_PASSWORD}'"
+        - "--env GERRIT_REFSPEC='${env.GERRIT_REFSPEC}'"
+        - "--env GIT_REPO_URL='${var.git-repo-url}'"
+        - "--env CHART_PATH='${var.integration-chart-path}'"
+        - "--env HELM_INTERNAL_REPO='${env.HELM_INTERNAL_REPO}'"
+        - "--env HELM_DROP_REPO='${env.HELM_DROP_REPO}'"
+        - "--env HELM_RELEASED_REPO='${env.HELM_RELEASED_REPO}'"
+        - "--env ARM_API_TOKEN='${env.ARTIFACTORY_PSW}'"
+        - "--env IGNORE_NON_RELEASED=false"
+        - "--env AUTOMATIC_RELEASE=false"
+        - "--env ALWAYS_RELEASE=false"
+        - "--env IGNORE_MISSING_DEPENDENCIES=true"
+        - "--env GIT_BRANCH='${env.GIT_BRANCH}'"
+        - "--env HELM_REPO_CREDENTIALS=${env.HELM_REPO_CREDENTIALS}"
+        - "--env CI_HELM=true"
+      cmd:
+        - ihc-auto prepare
+
+  publish-inca:
+    - task: publish-chart
+      docker-image: adp-release-ihcauto
+      docker-flags:
+        - "-v /etc/group:/etc/group:ro"
+        - "-v /etc/passwd:/etc/passwd:ro"
+        - "-v ${env.HELM_REPO_CREDENTIALS}:${env.HELM_REPO_CREDENTIALS}:ro"
+        - "--env CHART_NAME='${env.CHART_NAME}'"
+        - "--env CHART_VERSION='${env.CHART_VERSION}'"
+        - "--env GERRIT_USERNAME='${env.GERRIT_USERNAME}'"
+        - "--env GERRIT_PASSWORD='${env.GERRIT_PASSWORD}'"
+        - "--env GERRIT_REFSPEC='${env.GERRIT_REFSPEC}'"
+        - "--env GERRIT_TOPIC=inca_cniv"
+        - "--env GIT_REPO_URL='${var.git-repo-url}'"
+        - "--env CHART_PATH='${var.integration-chart-path}'"
+        - "--env HELM_INTERNAL_REPO='${env.HELM_INTERNAL_REPO}'"
+        - "--env HELM_DROP_REPO='${env.HELM_DROP_REPO}'"
+        - "--env HELM_RELEASED_REPO='${env.HELM_RELEASED_REPO}'"
+        - "--env ARM_API_TOKEN='${env.ARTIFACTORY_PSW}'"
+        - "--env IGNORE_NON_RELEASED=false"
+        - "--env AUTOMATIC_RELEASE=false"
+        - "--env ALWAYS_RELEASE=false"
+        - "--env IGNORE_MISSING_DEPENDENCIES=true"
+        - "--env ALLOW_DOWNGRADE=false"
+        - "--env HELM_REPO_CREDENTIALS=${env.HELM_REPO_CREDENTIALS}"
+        - "--env CI_HELM=true"
+        - "--env WAIT_SUBMITTABLE_BEFORE_PUBLISH=true"
+        - "--env WAIT_TIMEOUT_SEC_BEFORE_PUBLISH=180"
+      cmd:
+        - ihc-auto publish
+
+  # Integration values file rules
+  build-integration-value:
+    - task: build-integration-value
+      cmd:
+       - cp -rf ${integration-values-path}/eric-cniv-enm-integration-extra-large-production-values.yaml  .bob/eric-cniv-enm-integration-extra-large-production-values-${var.version}.yaml
+       - cp -rf ${integration-values-path}/eric-cniv-enm-integration-small-production-values.yaml  .bob/eric-cniv-enm-integration-small-production-values-${var.version}.yaml
+
+  yaml-validation:
+    - task: yaml-validation
+      docker-image: yaml-lint
+      cmd:
+       - yamllint .bob/eric-cniv-enm-integration-extra-large-production-values-${var.version}.yaml -c /var/tmp/custom-config.yaml
+       - yamllint .bob/eric-cniv-enm-integration-small-production-values-${var.version}.yaml -c /var/tmp/custom-config.yaml
+
+  push-integration-value:
+    - task: push-integration-value
+      docker-image: adp-release-ihcauto
+      cmd:
+       - arm-upload -f .bob/eric-cniv-enm-integration-extra-large-production-values-${var.version}.yaml -u ${helm-chart-drop-repo}/${helm-chart-drop-integration-values-path} -t ${env.ARTIFACTORY_PSW}
+       - arm-upload -f .bob/eric-cniv-enm-integration-small-production-values-${var.version}.yaml -u ${helm-chart-drop-repo}/${helm-chart-drop-integration-values-path} -t ${env.ARTIFACTORY_PSW}
+
+  # Vulnerability Analysis
+  # Run kubeaudit
+  kube-audit:
+    - task: helm-template
+      docker-image: adp-release-auto
+      cmd: "helm template ${var.integration-chart-path} --output-dir=.bob/helm_src"
+    - task: kube-audit-test
+      docker-image: va-scan-kubeaudit
+      docker-flags:
+        - "--workdir /opt/va-scan-kubeaudit/"
+        - "-v ${env.PWD}/config:/opt/va-scan-kubeaudit/conf"
+        - "-v ${env.PWD}/build/va-reports/kube-audit-report/:/tmp/reports"
+        - "-v ${env.PWD}/.bob/helm_src:/tmp/src"
+      cmd: " "
+
+  # Run kubesec scanning
+  kubesec-scan:
+    - task: helm-template
+      docker-image: adp-release-auto
+      cmd: "helm template ${var.integration-chart-path} --output-dir=.bob/helm_kubesec"
+    - task: remove-files-not-for-scanning
+      cmd:
+        - rm -rf .bob/helm_kubesec/${var.helm-chart-name}/templates/tests
+        - rm -rf .bob/helm_kubesec/${var.helm-chart-name}/templates/hpa.yaml
+        - rm -rf .bob/helm_kubesec/${var.helm-chart-name}/templates/rolebinding.yaml
+    - task: kubesec-scan-test
+      docker-image: va-scan-kubesec
+      docker-flags:
+        - "--workdir /opt/va-scan-kubesec/"
+        - "-v ${env.PWD}/config:/opt/va-scan-kubesec/conf"
+        - "-v ${env.PWD}/build/va-reports/kubesec-reports/:/tmp/reports"
+        - "-v ${env.PWD}/.bob/helm_kubesec/:/tmp/src"
+      cmd: " "
+
+  # Fetch xray report
+  fetch-xray-report:
+    - task: fetch-xray-report
+      docker-image: adp-release-auto
+      cmd: bash -c 'fetch-xray
+          --config ${env.PWD}/config/xray_report.config
+          --debug
+          --user ${env.ARTIFACTORY_USR}
+          --apikey ${env.ARTIFACTORY_PSW}
+          --output ${env.PWD}/build/va-reports/xray-reports/xray_report.json
+          --set artifactory-subpath=${project-subpath}
+          --set image=${var.docker-image-name}
+          --set version=${var.version}-${var.commithash}
+          --raw-output ${env.PWD}/build/va-reports/xray-reports/raw_xray_report.json'
+
+  # Run trivy scan
+  trivy-inline-scan:
+    - task: fetch-image
+      cmd:
+      - "docker pull ${image-to-scan}"
+      - mkdir -p build/va-reports/trivy-reports
+    - task: trivy-inline-scan-console-report
+      docker-image: trivy-inline-scan
+      docker-in-docker: socket
+      cmd: ${image-to-scan}
+    - task: trivy-inline-scan-json-report
+      docker-image: trivy-inline-scan
+      docker-in-docker: socket
+      cmd: --format json --output build/va-reports/trivy-reports/trivy.report.json ${image-to-scan}
+
+  # Run anchore scan
+  anchore-grype-scan:
+    - task: fetch-image
+      cmd: "docker pull ${image-to-scan}"
+    - task: anchore-grype-scan
+      docker-image: grype-scan
+      docker-in-docker: socket
+      cmd: grype_scan
+            --image ${image-to-scan}
+            --report-dir build/va-reports/anchore-reports
+
+  # Kubebench scan
+  kubebench-scan:
+    - task: kube-scan-test
+      docker-image: va-scan-kubebench
+      docker-flags:
+        - "--workdir /opt/kubebench/"
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "-v ${env.PWD}/config:/opt/kubebench/conf" #Place kube-cluster admin config, kubebench config file,
+        - "-v ${env.PWD}/reports/:/tmp/reports"
+      cmd: " "
+
+  # Kubehunter scan
+  get-node-ip:
+    - task: get-ip
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: kubectl get nodes -o wide -n ${var.namespace} | grep Ready | awk '{print $6}' | paste -s -d, - > .bob/var.node-ip
+
+  kube-hunter:
+    - task: kube-hunter
+      docker-image: va-scan-kubehunter
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--workdir /opt/kubehunter/"
+        - "-v ${env.PWD}/config:/opt/kubehunter/conf" #Place kubehunter config and kube-cluster admin config here
+        - "-v ${env.PWD}/reports/:/tmp/reports"
+      cmd: " "
+
+  # Nmap scan
+  nmap-port-scanning:
+    - task: nmap-port-scanning-test
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: /test.py --kubernetes-admin-conf=${env.KUBECONFIG}
+           --helm-user=${env.ARTIFACTORY_USR}
+           --arm-api-token=${env.ARTIFACTORY_PSW}
+           --kubernetes-namespace=${var.namespace}
+           --nmap-config-file=nmap_config.yaml
+           --nmap-test
+
+  get-pods:
+    - task: get-pods
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: kubectl get pods -o name -n ${var.namespace} --field-selector=status.phase=Running | grep -v elect-one-minute-cronjob |sed -e 's#pod/##g' > .bob/var.pods
+
+  nmap-cleanup:
+    - task: nmap-cleanup
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: /usr/share/helm/v3.8.1/helm uninstall nmap-${var.namespace} -n ${var.namespace} --wait|true
+    - task: unicorn-cleanup
+      condition: unicorn-release-exists:condition-true
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: /usr/share/helm/v3.8.1/helm uninstall unicorn-${var.namespace} -n ${var.namespace} --wait|true
+
+  # Tenable scan
+  get-pod-ip:
+    - task: get-pod-ip
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: kubectl get pods -n ${var.namespace} --output=custom-columns="IP:.status.podIP,STATUS:.status.phase" | grep Running | awk '{print $1}' | paste -s -d, - > .bob/var.pod-ip
+
+  tenable-scanning:
+    - task: tenable-scanning
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: python nessus.py -c nessus-sc.conf -t "${var.pod-ip}" -n 'Tenable' -v '1.0.0' -p 'VA_Scan' -o 'nessus_reports' --productname 'Independent_Service' --productnumber 'NA' -sd tenablesc-secrets.yaml -tsc -su -keep
+
+  # Zap scan
+  zap-cleanup:
+    - task: zap-cleanup
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env K8NAMESPACE=${var.namespace}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd: /usr/share/helm/v3.8.1/helm uninstall application-under-test-zap -n ${var.namespace} --wait|true
+
+  zap-scan:
+    - task: zap-scan
+      docker-image: adp-helm-kubectl
+      docker-flags:
+        - "--env KUBECONFIG=/tmp/admin.conf"
+        - "--volume ${env.KUBECONFIG}:/tmp/admin.conf:ro"
+        - "--volume ${env.PWD}:${env.PWD}"
+      cmd:  /test.py
+              -n ${var.namespace}
+              -k /tmp/admin.conf
+              -u ${env.ARTIFACTORY_USR}
+              -t ${env.ARTIFACTORY_PSW}
+              --only-zap-test
+              --skip-upgrade-test
+              --zap-config=config/zap_config.yaml
+
+  # Report generation
+  generate-VA-report-V2:
+     - task: generate-VA-report-V2
+       docker-image: adp-release-auto
+       cmd: bash -c 'va-report
+            --md
+            --output ./Vulnerability_Report_2.0.md
+            --config ./va_report_config.yaml
+            ${var.va-report-arguments}'
+
+  # Cleanup
+  clean:
+    - task: clean
+      cmd: rm -rf ${env.PWD}/${build-dir} .bob ${env.PWD}/user-guide-template/.bob
+
+  # Initialize, generate version and read commit hash
+  init:
+    - task: bob-dir
+      cmd: mkdir -p .bob
+    - task: user-guide-version
+      docker-image: adp-release-auto
+      cmd: ${env.PWD}/utils/generate-doc-version
+           --is-release ${env.RELEASE}
+          --source ${env.PWD}/user-guide-template
+          --output user-guide-version
+          -f ${env.PWD}/user-guide-template/VERSION_PREFIX
+    - task: date
+      docker-image: adp-release-auto
+      cmd: generate-date --output date
+    - task: propagate-bob-vars
+      cmd: cp -r .bob ${env.PWD}/user-guide-template/.bob
+    - task: tmpdir
+      cmd: mkdir -p ${env.PWD}/${build-dir}
+
+  # Run link to check MD files
+  lint-md:
+    - task: markdownlint
+      docker-image: doc-builder
+      cmd: markdownlint --config ./markdownlint.yaml $(git ls-files -- \*\.md | grep -v vendor | cat | xargs)
+
+  generate-docs:
+    - task: generate-user-guide-html
+      docker-image: adp-release-auto
+      cmd: doc-handler generate
+           --config ${config-file}
+           --output ${env.PWD}/${build-dir}/${html-output}
+           --format html
+
+  # Helm install
+  helm-dry-run:
+    - task: helm-dry-run
+      docker-image: adp-helm-kubectl
+      docker-flags: &docker_flags_kube_config
+        - "--env HOME=${env.HOME}"
+        - "--env K8S_NAMESPACE=${var.namespace}"
+        - "--env KUBECONFIG=${env.KUBECONFIG}"
+        - "--env ENABLE_HELM_V3"
+        - "--env SELI_ARTIFACTORY_REPO_USER"
+        - "--env SELI_ARTIFACTORY_REPO_PASS"
+        - "--env COLLECT_LOGS_SCRIPT_LOCATION"
+        - "--volume ${env.PWD}:${env.PWD}"
+        - "--volume ${env.HOME}:${env.HOME}"
+        - "--volume ${env.KUBECONFIG}:${env.KUBECONFIG}"
+      cmd: helm install ${var.helm-chart-name}-${var.version}.tgz
+        --dry-run
+        --debug
+        --generate-name > helm-install-dry-run.log
+
+  helm-install-prep:
+    - task: create-namespace-if-not-exists
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: kubectl create namespace ${var.namespace} || true
+    - task: helm-install-prep
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: kubectl create secret generic ${image-secret}
+        --type=kubernetes.io/dockerconfigjson
+        --from-file=".dockerconfigjson=${env.HOME}/.docker/config.json"
+        --namespace ${var.namespace} || true
+
+  helm-install:
+    - rule: helm-install-prep
+    - task: install-on-kubernetes
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: helm install ${env.HELM_RELEASE} ${var.helm-chart-name}-${var.version}.tgz
+        --namespace ${var.namespace}
+        --set eric-log-shipper.logshipper.autodiscover.namespace=${var.namespace}
+        --set imageCredentials.registry.pullSecret=${image-secret}
+        --set persistentVolumeClaim.storageClassName=${env.STORAGE_CLASS_NAME}
+        --timeout ${env.HELM_INSTALL_TIMEOUT}
+        --debug
+        --wait
+
+  healthcheck:
+    - task: healthcheck
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: ./healthcheck.sh
+
+  # Helm teardown
+  helm-teardown:
+    - task: uninstall-deployment
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: helm uninstall ${env.HELM_RELEASE} --namespace ${var.namespace} || true
+    - task: delete-namespace
+      docker-image: adp-helm-kubectl
+      docker-flags: *docker_flags_kube_config
+      cmd: kubectl delete namespace ${var.namespace} || true
+
+  pycodestyle:
+    - task: pycodestyle
+      docker-image: pgbm-ci-py37
+      cmd:
+        - pycodestyle $(find ${var.work-dir} -iname "*.py" -not -path "*/*bob-build-root*/*")
+           --ignore=W605 --count --show-source  | tee ./pycodestyle.log
+  pylint:
+    - task: mkdir
+      cmd:
+        - mkdir ${var.work-dir}/pylint
+    - task: version
+      docker-image: pgbm-ci-py37
+      cmd:
+        - pylint --version
+    - task: pylint
+      docker-image: pgbm-ci-py37
+      cmd:
+        - pylint $(find ${var.work-dir} -iname "*.py" ! -path "*/*bob-build-root*/*" )
+          --disable=W1401 --disable=E0401 --disable=R0201
+          --persistent=n --good-names='i','j','g','e','f'
+          --good-names-rgxs='p\w+_\w+_regex' --output=${var.work-dir}/pylint/pylint_results.log
+
+  set-working-directory:
+    - task: set-working-directory
+      cmd: pwd > .bob/var.work-dir
+
+  unit-tests:
+    - task: test-benchmark
+      docker-image: pgbm-ci-py37
+      docker-flags:
+        - "--workdir ${var.work-dir}/eric-pgbm-benchmark/src/main/python/tests"
+        - "--env PYTHONPATH=${var.work-dir}/eric-pgbm-benchmark/src/main/python"
+      cmd:
+        - pytest --cov=${var.work-dir}/eric-pgbm-benchmark/src/main/python | tee ./unittest.log
+    - task: test-init-wait
+      docker-image: pgbm-ci-py37
+      docker-flags:
+        - "--workdir ${var.work-dir}/eric-pgbm-init-wait/src/main/python/tests"
+        - "--env PYTHONPATH=${var.work-dir}/eric-pgbm-init-wait/src/main/python"
+      cmd:
+        - pytest --cov=${var.work-dir}/eric-pgbm-init-wait/src/main/python | tee -a ./unittest.log
+    - task: test-results
+      docker-image: pgbm-ci-py310
+      docker-flags:
+        - "--workdir ${var.work-dir}/eric-pgbm-results/src/main/python/tests"
+        - "--env PYTHONPATH=${var.work-dir}/eric-pgbm-results/src/main/python"
+      cmd:
+        - pytest --cov=${var.work-dir}/eric-pgbm-results/src/main/python | tee -a ./unittest.log

@@ -1,0 +1,18 @@
+# File Layout - Used in the Kube Config Files and values use for Jenkinsfiles/rules
+modelVersion: 2.0
+
+properties:
+  - helm-chart-name: CNIV #<chart name> e.g eric-enm-cniv-modeling-benchmark (used for Kube scans)
+  - product-contact: productspocemail@ericsson.com #<product spoc email> (used for Kube scans)
+  - namespace: #<chart name> e.g eric-enm-cniv-modeling-benchmark (required for helm install and some VA scans, Note: Depending on the job this will get either -pcr or -drop appended on to it during the job run.)
+  - cluster-id: #<K8s cluster id> e.g hall935 (required for helm install)
+  - storage-class-name: #<K8s StorageClass Name for dynamic provisioning - > e.g network-file (used for helm install)
+  - helm-install: #true or false (required for helm install stage in PCR Job, default is false)
+  - helm-install-drop: #true or false (required for helm install stage in Drop Job, default is false)
+  - helm-install-pause: #<number> e.g 5 (optional for helm install, default is 3. This used for sleep/pause in minutes between the helm install and running the healthcheck script.)
+  - helm-teardown-before: #true or false (optional for helm install, default is true. For running teardown rules: delete deployment and namespace)
+  - helm-teardown-after: #true or false  (optional for helm install, default is true. For running teardown rules: delete deployment and namespace)
+  - zap-base-url: #<Base URL> for ZAP Scan e.g http://192.168.217.183:8080 (required for Zap Scan)
+  - defensics-property: #Defensics property, e.g. uri https://ieatenmc11a008.athtem.eei.ericsson.se/ (optional for Defensics Scan.)
+  - defensics-testplan-dir: #Defensics testplan dir, e.g Defensics/testplans/web-app.testplan. (required for Defensics Scan.)
+  - defensics-testsuite-name: #Defensics test suite name, e.g. http-server. (required for Defensics Scan.)

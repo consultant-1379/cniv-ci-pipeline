@@ -1,0 +1,12 @@
+{ "repos":[
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-k8s-apis","chartPath": "chart/eric-cniv-k8s-apis","yamlFiles": ["values.yaml", "Chart.yaml"], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-netperf", "chartPath": "chart/eric-cniv-netperf", "yamlFiles":  ["values.yaml", "Chart.yaml"], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-storage", "chartPath": "chart/eric-cniv-storage", "yamlFiles":  ["values.yaml", "Chart.yaml"], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-resources", "chartPath": "chart/eric-cniv-resources", "yamlFiles":  ["values.yaml", "Chart.yaml"], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-k8s-version", "chartPath": "chart/eric-cniv-k8s-version", "yamlFiles":  ["values.yaml", "Chart.yaml"], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/ENM-Parent/SQ-Gate/com.ericsson.oss.containerisation/eric-enm-cniv-modeling-benchmark", "chartPath": "chart/eric-enm-cniv-modeling-benchmark", "yamlFiles":  ["values.yaml"], "cbos": "false", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-cniv-init-bench", "chartPath": "chart/eric-cniv-init-bench", "yamlFiles":  [""], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/com.ericsson.oss.ro/eric-oss-cn-infra-verification-tool", "chartPath": "chart/eric-oss-cn-infra-verification-tool", "yamlFiles":  [""], "cbos": "true", "branch": "master"},
+{"gitRepo": "OSS/ENM-Parent/SQ-Gate/com.ericsson.oss.containerisation/eric-enm-pm-benchmark", "chartPath": "chart/eric-enm-pm-bench", "yamlFiles":  ["values.yaml", "5kload-values.yaml", "80kload-values.yaml"], "cbos": "false", "branch": "master"}
+]
+}

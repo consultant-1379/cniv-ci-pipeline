@@ -1,0 +1,75 @@
+# COPYRIGHT Ericsson 2021
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+
+modelVersion: 2.0
+
+description: "CNIV CSAR Ruleset"
+
+docker:
+  registry: https://armdocker.rnd.ericsson.se/proj-eric-oss-cniv
+
+docker-images:
+  - adp-release-auto: armdocker.rnd.ericsson.se/sandbox/adp-staging/adp-cicd/bob-adp-release-auto:latest
+
+env :
+   - RELEASE (default=true)
+
+var :
+   - commit-hash
+   - version
+   - version-prefix
+   - rstate
+   - timestamp
+
+rules:
+  #-----------------------------------------
+  # CNIV CSAR Repo Rules
+  #-----------------------------------------
+
+  pre-code-review:
+    - description: For PreCodeReview Job - CNIV CSAR Ruleset
+    - task: echo-test-1
+      description: echo cmd
+      cmd: echo "Testing CNIV CSAR Ruleset"
+    - task: cat-test-2
+      description: cat cmd
+      cmd: cat ruleset2.0.yaml
+
+  #-----------------------------------------
+  # CNIV CSAR Rules
+  #-----------------------------------------
+
+  generate-new-version:
+    - task: generate-version
+      docker-image: adp-release-auto
+      cmd: version-handler generate --is-release ${env.RELEASE} --output version  --git-repo-path .
+    - task: set-version-prefix
+      cmd: cat VERSION_PREFIX > .bob/var.version-prefix
+    - task: generate-rstate
+      docker-image: adp-release-auto
+      cmd: get_rstate.py ${var.version} > .bob/var.rstate
+    - task: get-commit-hash
+      docker-image: adp-release-auto
+      cmd: git rev-parse HEAD > .bob/var.commit-hash
+
+  generate-new-snapshot-version:
+    - task: set-version-prefix
+      cmd: cat VERSION_PREFIX > .bob/var.version-prefix
+    - task: generate-rstate
+      docker-image: adp-release-auto
+      cmd: get_rstate.py ${var.version-prefix} > .bob/var.rstate
+    - task: generate-timestamp
+      cmd: date +%s > .bob/var.timestamp
+    - task: generate-version
+      cmd: echo ${var.version-prefix}-${var.timestamp}  > .bob/var.version
+    - task: get-commit-hash
+      cmd: git rev-parse HEAD > .bob/var.commit-hash

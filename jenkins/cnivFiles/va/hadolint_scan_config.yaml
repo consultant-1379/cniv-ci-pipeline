@@ -1,0 +1,31 @@
+no-fail: false # Make true to always return code 0; indicating process success; irrespective of the rule violations and failure-threshold
+no-color: false # Make true to disable colorized output
+format: codeclimate_json #Options [tty|json|checkstyle|codeclimate|gitlab_codeclimate|codacy]
+
+# List of registries to pull images from
+trustedRegistries:
+  - armdocker.rnd.ericsson.se
+
+# List of Rules to be Ignored
+ignored:
+# DL3026 is known false positive issue of Hadolint, refer to https://confluence.lmera.ericsson.se/display/ACD/Hadolint
+  - DL3026
+
+# Override the severity of a rule
+override:
+  error:
+    - DL3001
+  warning:
+    - DL3042
+  info:
+    - DL3032
+  style:
+    - DL3015
+
+# Expected labels in the Dockerfile
+label-schema:
+  author: text
+  version: semver
+strict-labels: true # Warns of additional labels outside the schema. Make false to disable the warning.
+
+failure-threshold: error #Exit with code 1; indicating process failure; when rules with severity equal to or above threshold are violated. Options [error|warning|info|style|ignore|none]
